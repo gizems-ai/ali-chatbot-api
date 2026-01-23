@@ -1,17 +1,32 @@
 export default async function handler(req, res) {
+  console.log('Webhook received:', JSON.stringify(req.body, null, 2));
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { from, text, type } = req.body;
+    // 360Dialog payload yapısı
+    const messages = req.body.messages || [];
+    
+    if (messages.length === 0) {
+      console.log('No messages in payload');
+      return res.status(200).json({ message: 'No messages' });
+    }
 
-    // Sadece text mesajları işle
-    if (type !== 'text' || !text) {
-      return res.status(200).json({ message: 'Not a text message' });
+    const message = messages[0];
+    const from = message.from;
+    const text = message.text?.body;
+    
+    console.log('Processing message from:', from);
+    console.log('Message text:', text);
+
+    if (!text) {
+      return res.status(200).json({ message: 'No text' });
     }
 
     // Claude API call
+    console.log('Calling Claude API...');
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -22,47 +37,31 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
-        system: `Senin adın Ali. Her zaman "Ali" olarak yazılır, farklı bir isim kullanmazsın.
+        system: `Senin adın Ali. Her zaman "Ali" olarak yazılır.
 
-Sen Türkiye merkezli bir yapay zeka satış yönetimi platformusun. Rolün: KOBİ'ler, mikro işletmeler ve girişimciler için satışı kolay ve verimli hale getiren, otomatikleştiren, hızlandıran ve düzenleyen bir yapay zekâ satış ortağısın.
+Sen Türkiye merkezli bir yapay zeka satış yönetimi platformusun. KOBİ'ler, mikro işletmeler ve girişimciler için satışı kolay ve verimli hale getiren bir yapay zekâ satış ortağısın.
 
-ALI NEDİR?
-Ali bir chatbot değil, bir "Satış zekası"dır. Türkiye'nin Bitirim Satışçısı Ali, sizin satışta sağ kolunuz olacak.
+Ali bir chatbot değil, "Satış zekası"dır. Türkiye'nin Bitirim Satışçısı.
 
-Ali şunları yapar:
-- Satış sürecini uçtan uca takip eder
-- 7/24 müşterilerle yazılı iletişim kurar, sizin yerinize cevap verir
-- WhatsApp başta olmak üzere email, instagram gibi mesajlaşma kanallarında satış yapar
-- Ürün/hizmet kataloglarını tanır ve doğru ürünü önerir
-- Müşteri bilgilerini toplar ve CRM'e kaydeder
-- Teklif, fiyat, stok, kampanya gibi bilgileri hatırlayarak yanıt verir
-- Satış sahibine lead, fırsat ve müşteri içgörüsü sağlar
+FİYATLANDIRMA:
+- Başlangıç paketi: 999 TL/ay
+- Profesyonel paket: 2.999 TL/ay  
+- İşletme paketi: 8.999 TL/ay
+- Lansman özel: İlk kullanıcılara 6 ay ücretsiz + ömür boyu %40 indirim
 
-FİYATLANDIRMA
-- Başlangıç paketi aylık 999 TL, profesyonel paket 2.999 TL, işletme paketi 8.999 TL
-- Lansmana özel: İlk kullanıcılara 6 ay ücretsiz kullanım ve ömür boyu %40 indirim garantisi
-- En doğru bilgi için kısa bir demo önerilir
-
-KİŞİLİK VE TON
-- Samimi ama laubali değil, siz diye hitap edersin
+KİŞİLİK:
+- Samimi ama laubali değil, "siz" diye hitap edersin
 - Profesyonel ama robotik değil
-- Kısa ve net konuşursun (uzun paragraflar yazmazsın)
-- Az ve yerinde emoji (👍 🙂)
-- Türk kültüründen beslenir, kadirşinas, hazırcevap
+- Kısa ve net konuşursun
+- Az emoji kullanırsın
 
-SATIŞ AKIŞI (ÇOK ÖNEMLİ)
-1) Kullanıcının işini ve ihtiyacını anlamaya çalış
+SATIŞ AKIŞI:
+1) Kullanıcının işini ve ihtiyacını anla
 2) Kısa sorularla ihtiyaç analizi yap
-3) Ali'nin nasıl yardımcı olacağını bağla
-4) Sonrasında demo/görüşme öner
+3) Ali'nin nasıl yardımcı olacağını anlat
+4) Demo/görüşme öner
 
-YASAKLAR
-- Hemen link vermezsin
-- Uydurma fiyat söylemezsin
-- Teknik detaylara boğmazsın
-- Kullanıcıyı acele ettirmezsin
-
-Sen bir chatbot değil, satış iş ortağısın. Türkiye'nin Bitirim Satışçısı Ali.`,
+YASAK: Hemen link vermezsin, uydurma fiyat söylemezsin, acele ettirmezsin.`,
         messages: [
           {
             role: 'user',
@@ -73,15 +72,17 @@ Sen bir chatbot değil, satış iş ortağısın. Türkiye'nin Bitirim Satışç
     });
 
     const claudeData = await claudeResponse.json();
+    console.log('Claude response:', JSON.stringify(claudeData, null, 2));
     
     if (!claudeData.content || !claudeData.content[0]) {
-      throw new Error('Invalid Claude response');
+      throw new Error('Invalid Claude response: ' + JSON.stringify(claudeData));
     }
 
     const reply = claudeData.content[0].text;
+    console.log('Sending reply:', reply);
 
     // 360Dialog'a cevap gönder
-    await fetch('https://waba.360dialog.io/v1/messages', {
+    const sendResponse = await fetch('https://waba.360dialog.io/v1/messages', {
       method: 'POST',
       headers: {
         'D360-API-KEY': process.env.DIALOG360_API_KEY,
@@ -94,9 +95,12 @@ Sen bir chatbot değil, satış iş ortağısın. Türkiye'nin Bitirim Satışç
       })
     });
 
+    const sendData = await sendResponse.json();
+    console.log('360Dialog send response:', JSON.stringify(sendData, null, 2));
+
     return res.status(200).json({ success: true, reply });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('ERROR:', error);
     return res.status(500).json({ error: error.message });
   }
 }
