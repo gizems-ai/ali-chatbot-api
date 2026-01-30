@@ -341,12 +341,22 @@
 
       const data = await res.json();
       
+      // N8N'den gelen thread ID'yi temizle
       if (data.threadId) {
-        currentThreadId = data.threadId;
+        let cleanThreadId = data.threadId;
+        if (cleanThreadId.startsWith('=')) {
+          cleanThreadId = cleanThreadId.substring(1);
+        }
+        currentThreadId = cleanThreadId;
         localStorage.setItem(THREAD_KEY, currentThreadId);
       }
 
-      const reply = data.response || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
+      // N8N'den gelen response'u temizle
+      let reply = data.response || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
+      if (reply.startsWith('=')) {
+        reply = reply.substring(1);
+      }
+      
       loadingBubble.innerHTML = '';
       loadingBubble.textContent = reply;
     } catch (err) {
