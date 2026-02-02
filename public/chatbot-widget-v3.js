@@ -347,5 +347,39 @@
       }
     }
   };
+  // ========================================
+  // MOBİL UYUMLULUK FİXİ - iPHONE SAFARİ
+  // ========================================
+  
+  // Touch event desteği ekle
+  const aliWidgetButton = document.getElementById('ali-widget-btn');
+  
+  if (aliWidgetButton) {
+    // Passive olmayan touch event
+    aliWidgetButton.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      window.AliChat.toggle();
+    }, { passive: false });
+    
+    // iOS için tap highlight kaldır
+    aliWidgetButton.style.webkitTapHighlightColor = 'transparent';
+    aliWidgetButton.style.userSelect = 'none';
+  }
+  
+  // Chat window içindeki butonlar için touch fix
+  closeBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    window.AliChat.close();
+  }, { passive: false });
+  
+  sendBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    handleSend();
+  }, { passive: false });
+  
+  // Input focus iOS fix
+  inputEl.addEventListener('touchstart', function(e) {
+    e.stopPropagation();
+  });
 
 })();
