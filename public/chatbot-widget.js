@@ -1,11 +1,6 @@
-// ===============================
-// ALI CHATBOT - WINDOW ONLY
-// N8N OpenAI Proxy
-// ===============================
-
+// ALI CHATBOT WIDGET V3 - iOS FIX + THREAD ID CLEAN
 (function() {
   'use strict';
-
   if (window.__aliChatWindowInjected) return;
   window.__aliChatWindowInjected = true;
 
@@ -15,6 +10,9 @@
   let isChatOpen = false;
   let isSending = false;
   let hasWelcomed = false;
+
+  console.log('🚀 Ali Chat Widget V3 - Mobile Fixed');
+  console.log('📌 Initial thread ID:', currentThreadId);
 
   const style = document.createElement('style');
   style.innerHTML = `
@@ -33,6 +31,7 @@
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       animation: ali-pop-in 0.18s ease-out;
+      -webkit-tap-highlight-color: transparent;
     }
     .ali-chat-window.open { display: flex; }
     @keyframes ali-pop-in {
@@ -78,13 +77,18 @@
       padding: 0;
       line-height: 1;
       transition: background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .ali-chat-close:hover { background: rgba(255, 255, 255, 0.3); }
+    .ali-chat-close:active { transform: scale(0.9); }
     .ali-chat-body {
       flex: 1;
       padding: 16px;
       background: #f7fafc;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .ali-chat-messages {
       display: flex;
@@ -162,6 +166,7 @@
       background: #f7fafc;
       color: #2d3748;
       transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
     }
     .ali-chat-input::placeholder { color: #a0aec0; }
     .ali-chat-input:focus {
@@ -179,8 +184,12 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .ali-chat-send:hover { transform: translateY(-1px); }
+    .ali-chat-send:active { transform: scale(0.95); }
     .ali-chat-send:disabled {
       opacity: 0.6;
       cursor: default;
@@ -202,10 +211,10 @@
   chatWindow.id = 'ali-chat-window';
   chatWindow.innerHTML = `
     <div class="ali-chat-header">
-      <div class="ali-chat-avatar">ALI</div>
+      <div class="ali-chat-avatar">Ali</div>
       <div class="ali-chat-title-row">
-        <div class="ali-chat-title">ALI – Satıştaki Sağ Kolunuz</div>
-        <div class="ali-chat-subtitle">Türkiye'nin satışçısı yanınızda</div>
+        <div class="ali-chat-title">Ali – Satıştaki Sağ Kolunuz</div>
+        <div class="ali-chat-subtitle">Türkiye'nin yapay zekalı bitirim satışçısı yanınızda</div>
       </div>
       <button class="ali-chat-close">&times;</button>
     </div>
@@ -256,41 +265,82 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // ========== YENİ: THREAD ID TEMİZLEME FONKSİYONU ==========
+  function cleanThreadId(threadId) {
+    if (!threadId) return null;
+    
+    let cleaned = threadId.toString().trim();
+    
+    // `=` işaretlerini kaldır (başta veya sonda)
+    cleaned = cleaned.replace(/^=+|=+$/g, '');
+    
+    // Boşlukları temizle
+    cleaned = cleaned.trim();
+    
+    // Geçerli thread ID formatı kontrolü
+    if (!/^thread_[a-zA-Z0-9_-]+$/.test(cleaned)) {
+      console.warn('⚠️ Invalid thread ID format:', cleaned);
+      return null;
+    }
+    
+    return cleaned;
+  }
+
   async function handleSend() {
     const value = (inputEl.value || '').trim();
     if (!value || isSending) return;
+    
+    console.log('📤 Sending message:', value);
+    console.log('🔗 Current thread ID (raw):', currentThreadId);
+    
+    // ========== YENİ: THREAD ID TEMİZLE ==========
+    const cleanedThreadId = cleanThreadId(currentThreadId);
+    console.log('🧹 Cleaned thread ID:', cleanedThreadId);
+    
     addUserMessage(value);
     inputEl.value = '';
     isSending = true;
     sendBtn.disabled = true;
     const loadingBubble = addBotMessage('', true);
+    
     try {
       const res = await fetch(N8N_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: value,
-          threadId: currentThreadId,
+          threadId: cleanedThreadId, // ========== YENİ: TEMİZ THREAD ID GÖNDER ==========
           context: { source: 'website', timestamp: new Date().toISOString() }
         })
       });
+      
       const data = await res.json();
+      console.log('📥 Response data:', data);
+      
+      // ========== YENİ: RESPONSE'DAN GELEN THREAD ID'Yİ TEMİZLE ==========
       if (data.threadId) {
-        let cleanThreadId = data.threadId;
-        if (cleanThreadId.startsWith('=')) {
-          cleanThreadId = cleanThreadId.substring(1);
+        const cleanedResponseThreadId = cleanThreadId(data.threadId);
+        if (cleanedResponseThreadId) {
+          currentThreadId = cleanedResponseThreadId;
+          console.log('💾 Saving cleaned thread ID:', currentThreadId);
+          localStorage.setItem(THREAD_KEY, currentThreadId);
+          console.log('✅ Verified saved:', localStorage.getItem(THREAD_KEY));
+        } else {
+          console.error('❌ Invalid thread ID received:', data.threadId);
         }
-        currentThreadId = cleanThreadId;
-        localStorage.setItem(THREAD_KEY, currentThreadId);
       }
+      
+      // Response mesajını temizle
       let reply = data.response || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
       if (reply.startsWith('=')) {
         reply = reply.substring(1);
       }
+      reply = reply.trim();
+      
       loadingBubble.innerHTML = '';
       loadingBubble.textContent = reply;
     } catch (err) {
-      console.error(err);
+      console.error('❌ Error:', err);
       loadingBubble.parentElement?.remove();
       addBotMessage('Şu an bağlantıda bir sıkıntı var. Birazdan tekrar dener misin?');
     } finally {
@@ -300,41 +350,79 @@
     }
   }
 
-  closeBtn.addEventListener('click', () => {
+  // ========== YENİ: iOS TOUCH EVENT DESTEĞI ==========
+  // Close button - click ve touch
+  closeBtn.addEventListener('click', function() {
     isChatOpen = false;
     chatWindow.classList.remove('open');
   });
+  
+  closeBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    isChatOpen = false;
+    chatWindow.classList.remove('open');
+  }, { passive: false });
 
+  // Send button - click ve touch
   sendBtn.addEventListener('click', handleSend);
+  
+  sendBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    handleSend();
+  }, { passive: false });
 
-  inputEl.addEventListener('keydown', (e) => {
+  // Input - Enter tuşu
+  inputEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   });
 
+  // Input - mobilde focus fix
+  inputEl.addEventListener('touchstart', function(e) {
+    e.stopPropagation();
+  });
+
+  // ========== YENİ: DEBUG FONKSİYONLARI ==========
   window.AliChat = {
     open: function() {
+      console.log('🔓 Opening chat');
       isChatOpen = true;
       chatWindow.classList.add('open');
       if (!hasWelcomed) {
         hasWelcomed = true;
         addBotMessage("Merhaba, ben Ali. İşlerini kolaylaştırıp satışlarını artırmak için sana nasıl yardımcı olabilirim?");
       }
-      setTimeout(() => inputEl.focus(), 120);
+      setTimeout(function() { 
+        inputEl.focus(); 
+      }, 120);
     },
     close: function() {
+      console.log('🔒 Closing chat');
       isChatOpen = false;
       chatWindow.classList.remove('open');
     },
     toggle: function() {
+      console.log('🔄 Toggling chat');
       if (isChatOpen) {
         this.close();
       } else {
         this.open();
       }
+    },
+    getThreadId: function() {
+      return currentThreadId;
+    },
+    clearThread: function() {
+      localStorage.removeItem(THREAD_KEY);
+      currentThreadId = null;
+      console.log('🗑️ Thread cleared');
     }
   };
+
+  console.log('✅ Ali Chat Widget initialized');
+  console.log('💡 Use window.AliChat.open() to open chat');
+  console.log('💡 Use window.AliChat.getThreadId() to check thread ID');
 
 })();
