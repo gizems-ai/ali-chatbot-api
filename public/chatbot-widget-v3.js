@@ -1,4 +1,4 @@
-// ALI CHATBOT WIDGET V3
+// ALI CHATBOT WIDGET V3 - iOS FIX + THREAD ID CLEAN
 (function() {
   'use strict';
   if (window.__aliChatWindowInjected) return;
@@ -11,7 +11,7 @@
   let isSending = false;
   let hasWelcomed = false;
 
-  console.log('🚀 Ali Chat Widget V3 loaded');
+  console.log('🚀 Ali Chat Widget V3 - Mobile Fixed');
   console.log('📌 Initial thread ID:', currentThreadId);
 
   const style = document.createElement('style');
@@ -31,6 +31,7 @@
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       animation: ali-pop-in 0.18s ease-out;
+      -webkit-tap-highlight-color: transparent;
     }
     .ali-chat-window.open { display: flex; }
     @keyframes ali-pop-in {
@@ -76,13 +77,18 @@
       padding: 0;
       line-height: 1;
       transition: background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .ali-chat-close:hover { background: rgba(255, 255, 255, 0.3); }
+    .ali-chat-close:active { transform: scale(0.9); }
     .ali-chat-body {
       flex: 1;
       padding: 16px;
       background: #f7fafc;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .ali-chat-messages {
       display: flex;
@@ -160,6 +166,7 @@
       background: #f7fafc;
       color: #2d3748;
       transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
     }
     .ali-chat-input::placeholder { color: #a0aec0; }
     .ali-chat-input:focus {
@@ -177,8 +184,12 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .ali-chat-send:hover { transform: translateY(-1px); }
+    .ali-chat-send:active { transform: scale(0.95); }
     .ali-chat-send:disabled {
       opacity: 0.6;
       cursor: default;
@@ -254,12 +265,37 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // Thread ID temizleme fonksiyonu
+  function cleanThreadId(threadId) {
+    if (!threadId) return null;
+    
+    let cleaned = threadId.toString().trim();
+    
+    // `=` işaretlerini kaldır (başta veya sonda)
+    cleaned = cleaned.replace(/^=+|=+$/g, '');
+    
+    // Boşlukları temizle
+    cleaned = cleaned.trim();
+    
+    // Geçerli thread ID formatı kontrolü
+    if (!/^thread_[a-zA-Z0-9_-]+$/.test(cleaned)) {
+      console.warn('⚠️ Invalid thread ID format:', cleaned);
+      return null;
+    }
+    
+    return cleaned;
+  }
+
   async function handleSend() {
     const value = (inputEl.value || '').trim();
     if (!value || isSending) return;
     
     console.log('📤 Sending message:', value);
-    console.log('🔗 Current thread ID:', currentThreadId);
+    console.log('🔗 Current thread ID (raw):', currentThreadId);
+    
+    // Thread ID'yi temizle
+    const cleanedThreadId = cleanThreadId(currentThreadId);
+    console.log('🧹 Cleaned thread ID:', cleanedThreadId);
     
     addUserMessage(value);
     inputEl.value = '';
@@ -273,7 +309,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: value,
-          threadId: currentThreadId,
+          threadId: cleanedThreadId, // Temizlenmiş thread ID gönder
           context: { source: 'website', timestamp: new Date().toISOString() }
         })
       });
@@ -281,21 +317,25 @@
       const data = await res.json();
       console.log('📥 Response data:', data);
       
+      // Response'dan gelen thread ID'yi temizle ve kaydet
       if (data.threadId) {
-        let cleanThreadId = data.threadId;
-        if (cleanThreadId.startsWith('=')) {
-          cleanThreadId = cleanThreadId.substring(1);
+        const cleanedResponseThreadId = cleanThreadId(data.threadId);
+        if (cleanedResponseThreadId) {
+          currentThreadId = cleanedResponseThreadId;
+          console.log('💾 Saving cleaned thread ID:', currentThreadId);
+          localStorage.setItem(THREAD_KEY, currentThreadId);
+          console.log('✅ Verified saved:', localStorage.getItem(THREAD_KEY));
+        } else {
+          console.error('❌ Invalid thread ID received:', data.threadId);
         }
-        currentThreadId = cleanThreadId;
-        console.log('💾 Saving thread ID:', currentThreadId);
-        localStorage.setItem(THREAD_KEY, currentThreadId);
-        console.log('✅ Verified saved:', localStorage.getItem(THREAD_KEY));
       }
       
+      // Response mesajını temizle
       let reply = data.response || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
       if (reply.startsWith('=')) {
         reply = reply.substring(1);
       }
+      reply = reply.trim();
       
       loadingBubble.innerHTML = '';
       loadingBubble.textContent = reply;
@@ -310,20 +350,40 @@
     }
   }
 
-  closeBtn.addEventListener('click', () => {
+  // Close button - click ve touch
+  closeBtn.addEventListener('click', function() {
     isChatOpen = false;
     chatWindow.classList.remove('open');
   });
+  
+  closeBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    isChatOpen = false;
+    chatWindow.classList.remove('open');
+  }, { passive: false });
 
+  // Send button - click ve touch
   sendBtn.addEventListener('click', handleSend);
+  
+  sendBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    handleSend();
+  }, { passive: false });
 
-  inputEl.addEventListener('keydown', (e) => {
+  // Input - Enter tuşu
+  inputEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   });
 
+  // Input - mobilde focus fix
+  inputEl.addEventListener('touchstart', function(e) {
+    e.stopPropagation();
+  });
+
+  // Public API
   window.AliChat = {
     open: function() {
       console.log('🔓 Opening chat');
@@ -333,53 +393,36 @@
         hasWelcomed = true;
         addBotMessage("Merhaba, ben Ali. İşlerini kolaylaştırıp satışlarını artırmak için sana nasıl yardımcı olabilirim?");
       }
-      setTimeout(() => inputEl.focus(), 120);
+      setTimeout(function() { 
+        inputEl.focus(); 
+      }, 120);
     },
     close: function() {
+      console.log('🔒 Closing chat');
       isChatOpen = false;
       chatWindow.classList.remove('open');
     },
     toggle: function() {
+      console.log('🔄 Toggling chat');
       if (isChatOpen) {
         this.close();
       } else {
         this.open();
       }
+    },
+    // Debug fonksiyonu
+    getThreadId: function() {
+      return currentThreadId;
+    },
+    clearThread: function() {
+      localStorage.removeItem(THREAD_KEY);
+      currentThreadId = null;
+      console.log('🗑️ Thread cleared');
     }
   };
-  // ========================================
-  // MOBİL UYUMLULUK FİXİ - iPHONE SAFARİ
-  // ========================================
-  
-  // Touch event desteği ekle
-  const aliWidgetButton = document.getElementById('ali-widget-btn');
-  
-  if (aliWidgetButton) {
-    // Passive olmayan touch event
-    aliWidgetButton.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-      window.AliChat.toggle();
-    }, { passive: false });
-    
-    // iOS için tap highlight kaldır
-    aliWidgetButton.style.webkitTapHighlightColor = 'transparent';
-    aliWidgetButton.style.userSelect = 'none';
-  }
-  
-  // Chat window içindeki butonlar için touch fix
-  closeBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    window.AliChat.close();
-  }, { passive: false });
-  
-  sendBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    handleSend();
-  }, { passive: false });
-  
-  // Input focus iOS fix
-  inputEl.addEventListener('touchstart', function(e) {
-    e.stopPropagation();
-  });
+
+  console.log('✅ Ali Chat Widget initialized');
+  console.log('💡 Use window.AliChat.open() to open chat');
+  console.log('💡 Use window.AliChat.getThreadId() to check thread ID');
 
 })();
