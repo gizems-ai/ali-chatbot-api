@@ -1,428 +1,188 @@
-// ALI CHATBOT WIDGET V3 - iOS FIX + THREAD ID CLEAN
 (function() {
   'use strict';
-  if (window.__aliChatWindowInjected) return;
-  window.__aliChatWindowInjected = true;
-
-  const N8N_URL = "https://alisalesai.app.n8n.cloud/webhook/ali-proxy";
-  const THREAD_KEY = "ali_thread_id";
-  let currentThreadId = localStorage.getItem(THREAD_KEY) || null;
-  let isChatOpen = false;
-  let isSending = false;
-  let hasWelcomed = false;
-
-  console.log('🚀 Ali Chat Widget V3 - Mobile Fixed');
-  console.log('📌 Initial thread ID:', currentThreadId);
-
-  const style = document.createElement('style');
-  style.innerHTML = `
-    .ali-chat-window {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      width: min(420px, calc(100vw - 40px));
-      max-height: min(600px, calc(100vh - 80px));
-      background: white;
-      border-radius: 24px;
-      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.55);
+  
+  const WEBHOOK_URL = 'https://alisalesai.app.n8n.cloud/webhook/ali-proxy';
+  
+  const styles = `
+    #ali-chatbot {
       display: none;
-      flex-direction: column;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 400px;
+      max-width: calc(100vw - 40px);
+      height: 600px;
+      max-height: calc(100vh - 40px);
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
       z-index: 999998;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: ali-pop-in 0.18s ease-out;
-      -webkit-tap-highlight-color: transparent;
+      flex-direction: column;
     }
-    .ali-chat-window.open { display: flex; }
-    @keyframes ali-pop-in {
-      from { opacity: 0; transform: scale(0.85) translateY(8px); }
-      to { opacity: 1; transform: scale(1) translateY(0); }
-    }
-    .ali-chat-header {
-      padding: 16px 18px;
+    #ali-chatbot.open { display: flex; }
+    #ali-chatbot-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      padding: 20px;
+      border-radius: 16px 16px 0 0;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 12px;
     }
-    .ali-chat-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #667eea;
-      font-weight: 800;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    .ali-chat-title-row { flex: 1; min-width: 0; }
-    .ali-chat-title { font-size: 16px; font-weight: 700; }
-    .ali-chat-subtitle { font-size: 13px; opacity: 0.9; }
-    .ali-chat-close {
-      background: rgba(255, 255, 255, 0.2);
+    #ali-chatbot-close {
+      background: rgba(255,255,255,0.2);
       border: none;
       color: white;
       font-size: 24px;
+      cursor: pointer;
       width: 32px;
       height: 32px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      line-height: 1;
-      transition: background 0.2s;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-      -webkit-user-select: none;
+      border-radius: 8px;
     }
-    .ali-chat-close:hover { background: rgba(255, 255, 255, 0.3); }
-    .ali-chat-close:active { transform: scale(0.9); }
-    .ali-chat-body {
+    #ali-chatbot-messages {
       flex: 1;
-      padding: 16px;
-      background: #f7fafc;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      padding: 20px;
+      background: #f9fafb;
     }
-    .ali-chat-messages {
+    #ali-chatbot-input-area {
+      padding: 20px;
+      border-top: 1px solid #e5e7eb;
+      background: white;
       display: flex;
-      flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
-    .ali-msg-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
+    #ali-chatbot-input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
     }
-    .ali-msg-row.user { justify-content: flex-end; }
-    .ali-msg-bot-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    #ali-chatbot-send {
+      background: #667eea;
       color: white;
-      font-size: 12px;
-      font-weight: 800;
-      flex-shrink: 0;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
     }
-    .ali-msg-bubble {
-      max-width: 75%;
+    #ali-chatbot-send:hover { background: #5568d3; }
+    .ali-message {
+      margin-bottom: 16px;
+      display: flex;
+    }
+    .ali-message.user {
+      justify-content: flex-end;
+    }
+    .ali-message-content {
+      max-width: 80%;
       padding: 12px 16px;
-      border-radius: 16px;
+      border-radius: 12px;
       font-size: 14px;
       line-height: 1.5;
     }
-    .ali-msg-bubble.bot {
-      background: white;
-      color: #2d3748;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    .ali-msg-bubble.user {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .ali-message.user .ali-message-content {
+      background: #667eea;
       color: white;
-      border-radius: 16px 16px 4px 16px;
+      border-radius: 12px 12px 0 12px;
     }
-    .ali-msg-loading {
-      display: inline-flex;
-      gap: 4px;
-    }
-    .ali-msg-loading span {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #cbd5e0;
-      animation: ali-bounce 0.9s infinite ease-in-out;
-    }
-    .ali-msg-loading span:nth-child(2) { animation-delay: 0.18s; }
-    .ali-msg-loading span:nth-child(3) { animation-delay: 0.36s; }
-    @keyframes ali-bounce {
-      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-      40% { transform: translateY(-6px); opacity: 1; }
-    }
-    .ali-chat-footer {
-      padding: 12px 16px;
+    .ali-message.assistant .ali-message-content {
       background: white;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      gap: 8px;
-    }
-    .ali-chat-input {
-      flex: 1;
-      border-radius: 24px;
-      border: 1px solid #cbd5e0;
-      padding: 10px 16px;
-      font-size: 14px;
-      outline: none;
-      background: #f7fafc;
-      color: #2d3748;
-      transition: all 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .ali-chat-input::placeholder { color: #a0aec0; }
-    .ali-chat-input:focus {
-      border-color: #667eea;
-      background: white;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-    .ali-chat-send {
-      border-radius: 24px;
-      border: none;
-      padding: 10px 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .ali-chat-send:hover { transform: translateY(-1px); }
-    .ali-chat-send:active { transform: scale(0.95); }
-    .ali-chat-send:disabled {
-      opacity: 0.6;
-      cursor: default;
-      transform: none;
-    }
-    @media (max-width: 640px) {
-      .ali-chat-window {
-        right: 16px;
-        bottom: 16px;
-        width: calc(100vw - 32px);
-        max-height: calc(100vh - 40px);
-      }
+      color: #1f2937;
+      border-radius: 12px 12px 12px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
   `;
-  document.head.appendChild(style);
-
-  const chatWindow = document.createElement('div');
-  chatWindow.className = 'ali-chat-window';
-  chatWindow.id = 'ali-chat-window';
-  chatWindow.innerHTML = `
-    <div class="ali-chat-header">
-      <div class="ali-chat-avatar">Ali</div>
-      <div class="ali-chat-title-row">
-        <div class="ali-chat-title">Ali – Satıştaki Sağ Kolunuz</div>
-        <div class="ali-chat-subtitle">Türkiye'nin yapay zekalı bitirim satışçısı yanınızda</div>
+  
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+  
+  const chatbotHTML = `
+    <div id="ali-chatbot">
+      <div id="ali-chatbot-header">
+        <div>
+          <h3 style="margin:0;font-size:16px">Ali - Satış Asistanı</h3>
+          <p style="margin:4px 0 0;font-size:12px;opacity:0.9">Online</p>
+        </div>
+        <button id="ali-chatbot-close">×</button>
       </div>
-      <button class="ali-chat-close">&times;</button>
-    </div>
-    <div class="ali-chat-body">
-      <div class="ali-chat-messages"></div>
-    </div>
-    <div class="ali-chat-footer">
-      <input class="ali-chat-input" type="text" placeholder="Mesajınızı yazın..." />
-      <button class="ali-chat-send">Gönder</button>
+      <div id="ali-chatbot-messages"></div>
+      <div id="ali-chatbot-input-area">
+        <input type="text" id="ali-chatbot-input" placeholder="Mesajınızı yazın...">
+        <button id="ali-chatbot-send">Gönder</button>
+      </div>
     </div>
   `;
-
-  document.body.appendChild(chatWindow);
-
-  const closeBtn = chatWindow.querySelector('.ali-chat-close');
-  const messagesEl = chatWindow.querySelector('.ali-chat-messages');
-  const inputEl = chatWindow.querySelector('.ali-chat-input');
-  const sendBtn = chatWindow.querySelector('.ali-chat-send');
-
-  function addBotMessage(text, isLoading = false) {
-    const row = document.createElement('div');
-    row.className = 'ali-msg-row bot';
-    const avatar = document.createElement('div');
-    avatar.className = 'ali-msg-bot-avatar';
-    avatar.textContent = 'ALI';
-    const bubble = document.createElement('div');
-    bubble.className = 'ali-msg-bubble bot';
-    if (isLoading) {
-      bubble.innerHTML = '<div class="ali-msg-loading"><span></span><span></span><span></span></div>';
-    } else {
-      bubble.textContent = text;
-    }
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return bubble;
+  
+  document.body.insertAdjacentHTML('beforeend', chatbotHTML);
+  
+  const chatbot = document.getElementById('ali-chatbot');
+  const closeBtn = document.getElementById('ali-chatbot-close');
+  const messagesDiv = document.getElementById('ali-chatbot-messages');
+  const inputField = document.getElementById('ali-chatbot-input');
+  const sendBtn = document.getElementById('ali-chatbot-send');
+  
+  let threadId = localStorage.getItem('ali_thread_id');
+  
+  function addMessage(content, isUser) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `ali-message ${isUser ? 'user' : 'assistant'}`;
+    msgDiv.innerHTML = `<div class="ali-message-content">${content}</div>`;
+    messagesDiv.appendChild(msgDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
-
-  function addUserMessage(text) {
-    const row = document.createElement('div');
-    row.className = 'ali-msg-row user';
-    const bubble = document.createElement('div');
-    bubble.className = 'ali-msg-bubble user';
-    bubble.textContent = text;
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  // Thread ID temizleme fonksiyonu
-  function cleanThreadId(threadId) {
-    if (!threadId) return null;
+  
+  async function sendMessage() {
+    const message = inputField.value.trim();
+    if (!message) return;
     
-    let cleaned = threadId.toString().trim();
-    
-    // `=` işaretlerini kaldır (başta veya sonda)
-    cleaned = cleaned.replace(/^=+|=+$/g, '');
-    
-    // Boşlukları temizle
-    cleaned = cleaned.trim();
-    
-    // Geçerli thread ID formatı kontrolü
-    if (!/^thread_[a-zA-Z0-9_-]+$/.test(cleaned)) {
-      console.warn('⚠️ Invalid thread ID format:', cleaned);
-      return null;
-    }
-    
-    return cleaned;
-  }
-
-  async function handleSend() {
-    const value = (inputEl.value || '').trim();
-    if (!value || isSending) return;
-    
-    console.log('📤 Sending message:', value);
-    console.log('🔗 Current thread ID (raw):', currentThreadId);
-    
-    // Thread ID'yi temizle
-    const cleanedThreadId = cleanThreadId(currentThreadId);
-    console.log('🧹 Cleaned thread ID:', cleanedThreadId);
-    
-    addUserMessage(value);
-    inputEl.value = '';
-    isSending = true;
+    addMessage(message, true);
+    inputField.value = '';
     sendBtn.disabled = true;
-    const loadingBubble = addBotMessage('', true);
     
     try {
-      const res = await fetch(N8N_URL, {
+      const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: value,
-          threadId: cleanedThreadId, // Temizlenmiş thread ID gönder
-          context: { source: 'website', timestamp: new Date().toISOString() }
-        })
+        body: JSON.stringify({ message, threadId })
       });
       
-      const data = await res.json();
-      console.log('📥 Response data:', data);
+      const data = await response.json();
       
-      // Response'dan gelen thread ID'yi temizle ve kaydet
       if (data.threadId) {
-        const cleanedResponseThreadId = cleanThreadId(data.threadId);
-        if (cleanedResponseThreadId) {
-          currentThreadId = cleanedResponseThreadId;
-          console.log('💾 Saving cleaned thread ID:', currentThreadId);
-          localStorage.setItem(THREAD_KEY, currentThreadId);
-          console.log('✅ Verified saved:', localStorage.getItem(THREAD_KEY));
-        } else {
-          console.error('❌ Invalid thread ID received:', data.threadId);
-        }
+        threadId = data.threadId;
+        localStorage.setItem('ali_thread_id', threadId);
       }
       
-      // Response mesajını temizle
-      let reply = data.response || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
-      if (reply.startsWith('=')) {
-        reply = reply.substring(1);
+      if (data.response) {
+        addMessage(data.response, false);
       }
-      reply = reply.trim();
-      
-      loadingBubble.innerHTML = '';
-      loadingBubble.textContent = reply;
-    } catch (err) {
-      console.error('❌ Error:', err);
-      loadingBubble.parentElement?.remove();
-      addBotMessage('Şu an bağlantıda bir sıkıntı var. Birazdan tekrar dener misin?');
+    } catch (error) {
+      console.error('Error:', error);
+      addMessage('Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.', false);
     } finally {
-      isSending = false;
       sendBtn.disabled = false;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
   }
-
-  // Close button - click ve touch
-  closeBtn.addEventListener('click', function() {
-    isChatOpen = false;
-    chatWindow.classList.remove('open');
-  });
   
-  closeBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    isChatOpen = false;
-    chatWindow.classList.remove('open');
-  }, { passive: false });
-
-  // Send button - click ve touch
-  sendBtn.addEventListener('click', handleSend);
-  
-  sendBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    handleSend();
-  }, { passive: false });
-
-  // Input - Enter tuşu
-  inputEl.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  });
-
-  // Input - mobilde focus fix
-  inputEl.addEventListener('touchstart', function(e) {
-    e.stopPropagation();
-  });
-
-  // Public API
   window.AliChat = {
     open: function() {
-      console.log('🔓 Opening chat');
-      isChatOpen = true;
-      chatWindow.classList.add('open');
-      if (!hasWelcomed) {
-        hasWelcomed = true;
-        addBotMessage("Merhaba, ben Ali. İşlerini kolaylaştırıp satışlarını artırmak için sana nasıl yardımcı olabilirim?");
-      }
-      setTimeout(function() { 
-        inputEl.focus(); 
-      }, 120);
+      chatbot.classList.add('open');
     },
     close: function() {
-      console.log('🔒 Closing chat');
-      isChatOpen = false;
-      chatWindow.classList.remove('open');
-    },
-    toggle: function() {
-      console.log('🔄 Toggling chat');
-      if (isChatOpen) {
-        this.close();
-      } else {
-        this.open();
-      }
-    },
-    // Debug fonksiyonu
-    getThreadId: function() {
-      return currentThreadId;
-    },
-    clearThread: function() {
-      localStorage.removeItem(THREAD_KEY);
-      currentThreadId = null;
-      console.log('🗑️ Thread cleared');
+      chatbot.classList.remove('open');
     }
   };
-
-  console.log('✅ Ali Chat Widget initialized');
-  console.log('💡 Use window.AliChat.open() to open chat');
-  console.log('💡 Use window.AliChat.getThreadId() to check thread ID');
-
+  
+  closeBtn.addEventListener('click', () => window.AliChat.close());
+  sendBtn.addEventListener('click', sendMessage);
+  inputField.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+  
 })();
