@@ -1,7 +1,7 @@
 (function() {
   'use strict';
   
-  const WEBHOOK_URL = 'https://alisalesai.app.n8n.cloud/webhook/ali-proxy';
+  const N8N_URL = "https://alisalesai.app.n8n.cloud/webhook/chatbot";
   
   const styles = `
     #ali-chatbot {
