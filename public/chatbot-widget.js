@@ -4,7 +4,7 @@
   if (window.__aliChatWindowInjected) return;
   window.__aliChatWindowInjected = true;
 
- const N8N_URL = "https://alisalesai.app.n8n.cloud/webhook/chatbot-new";
+ const N8N_URL = "https://alisalesai.app.n8n.cloud/webhook/chatbot";
   const THREAD_KEY = "ali_thread_id";
   let currentThreadId = localStorage.getItem(THREAD_KEY) || null;
   let isChatOpen = false;
