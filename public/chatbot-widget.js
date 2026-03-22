@@ -1,11 +1,12 @@
-// ALI CHATBOT WIDGET V4 - PRODUCTION READY
+// ALI CHATBOT WIDGET V5 - MULTI-TENANT
 (function() {
   'use strict';
   if (window.__aliChatWindowInjected) return;
   window.__aliChatWindowInjected = true;
 
-  const N8N_URL = "https://alisalesai.app.n8n.cloud/webhook/chatbot";
-  const THREAD_KEY = "ali_thread_id";
+  const N8N_URL = "https://n8n.alisales.ai/webhook/chatbot-v2";
+  const TENANT_ID = (document.currentScript || document.querySelector('script[data-tenant]'))?.dataset?.tenant || '905324069594';
+  const THREAD_KEY = "ali_thread_id_" + TENANT_ID;
   let currentThreadId = localStorage.getItem(THREAD_KEY) || null;
   let isChatOpen = false;
   let isSending = false;
@@ -303,6 +304,7 @@
         body: JSON.stringify({
           message: value,
           threadId: cleanedThreadId,
+          tenant_id: TENANT_ID,
           context: { source: 'website', timestamp: new Date().toISOString() }
         })
       });
