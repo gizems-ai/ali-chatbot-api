@@ -325,15 +325,21 @@
         }
       }
       
+      // Devir sonrası sessiz mod — kullanıcıya mesaj gösterme
+      if (data.silent) {
+        loadingBubble.parentElement?.remove();
+        return;
+      }
+
       // Response mesajını al - ÖNEMLİ: data.text kullan!
       let reply = data.text || 'Şu an bir sorun yaşıyorum, birazdan tekrar dener misin?';
-      
+
       // Eğer response "=" ile başlıyorsa temizle
       if (reply.startsWith('=')) {
         reply = reply.substring(1);
       }
       reply = reply.trim();
-      
+
       loadingBubble.innerHTML = '';
       loadingBubble.textContent = reply;
     } catch (err) {
