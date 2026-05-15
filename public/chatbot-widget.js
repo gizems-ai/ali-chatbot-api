@@ -1,4 +1,4 @@
-// ALI CHATBOT WIDGET V6 — SELF-CONTAINED
+// ALI CHATBOT WIDGET V6 — SELF-CONTAINED (v17.1)
 // Tek <script> tag ile bubble + chat + CSS gelir.
 //
 // Zorunlu:
@@ -26,13 +26,13 @@
   var scriptTag     = document.currentScript || document.querySelector('script[data-tenant]');
   var TENANT_ID     = (scriptTag && scriptTag.dataset.tenant)          || '905324069594';
   var TENANT_NAME   = (scriptTag && scriptTag.dataset.tenantName)      || '';
-  var TOOLTIP_TEXT  = (scriptTag && scriptTag.dataset.tooltip)         || 'Yardıma ihtiyacın var mı? 👋';
+  var TOOLTIP_TEXT  = (scriptTag && scriptTag.dataset.tooltip)         || '';
   var MOBILE_MODE   = (scriptTag && scriptTag.dataset.mobileMode)      || 'chat';
   var WA_NUMBER     = (scriptTag && scriptTag.dataset.whatsappNumber)  || '';
   var BRAND_COLOR   = (scriptTag && scriptTag.dataset.brandColor)      || '#5B47E0';
   var GREETING      = (scriptTag && scriptTag.dataset.greeting)        || '';
   var N8N_URL       = 'https://n8n.alisales.ai/webhook/chatbot-v2';
-  var AVATAR_URL    = 'https://raw.githubusercontent.com/gizems-ai/ali-chatbot-api/main/public/public/public:ali-avatar.png';
+  var AVATAR_URL    = 'https://alisales.ai/assets/img/ali-avatar.png';
   var THREAD_KEY    = 'ali_thread_id_' + TENANT_ID;
 
   var GREETINGS_MULTILANG = null;
@@ -40,7 +40,27 @@
     var raw = scriptTag && scriptTag.dataset.greetings;
     if (raw) GREETINGS_MULTILANG = JSON.parse(raw);
   } catch (e) {
-    console.warn('[AliChat v17] data-greetings JSON parse error:', e);
+    console.warn('[AliChat v17.1] data-greetings JSON parse error:', e);
+  }
+
+  var TOOLTIPS_MULTILANG = null;
+  try {
+    var rawTooltips = scriptTag && scriptTag.dataset.tooltips;
+    if (rawTooltips) TOOLTIPS_MULTILANG = JSON.parse(rawTooltips);
+  } catch (e) {
+    console.warn('[AliChat v17.1] data-tooltips JSON parse error:', e);
+  }
+
+  function resolveTooltip() {
+    if (TOOLTIP_TEXT) return TOOLTIP_TEXT;
+    if (TOOLTIPS_MULTILANG) {
+      var lang = ((document.documentElement.lang || 'en').substring(0, 2)).toLowerCase();
+      if (TOOLTIPS_MULTILANG[lang]) return TOOLTIPS_MULTILANG[lang];
+      if (TOOLTIPS_MULTILANG['en']) return TOOLTIPS_MULTILANG['en'];
+      var firstKey = Object.keys(TOOLTIPS_MULTILANG)[0];
+      if (firstKey) return TOOLTIPS_MULTILANG[firstKey];
+    }
+    return 'Yardıma ihtiyacın var mı? 👋';
   }
 
   var currentThreadId = localStorage.getItem(THREAD_KEY) || null;
@@ -152,9 +172,8 @@
     '}',
     '.ali-chat-hdr-avatar {',
     '  width:40px; height:40px; border-radius:50%;',
-    '  background:rgba(255,255,255,0.2);',
-    '  display:flex; align-items:center; justify-content:center;',
-    '  color:var(--ali-text-on-brand); font-weight:800; font-size:16px; flex-shrink:0;',
+    '  border:2px solid rgba(255,255,255,0.9);',
+    '  object-fit:cover; flex-shrink:0;',
     '}',
     '.ali-chat-title-row { flex:1; min-width:0; }',
     '.ali-chat-title    { font-size:16px; font-weight:700; }',
@@ -221,7 +240,7 @@
 
   var tooltip = document.createElement('div');
   tooltip.className = 'ali-tooltip';
-  tooltip.textContent = TOOLTIP_TEXT;
+  tooltip.textContent = resolveTooltip();
 
   var bubble = document.createElement('div');
   bubble.className = 'ali-bubble';
@@ -240,7 +259,7 @@
   chatWindow.id = 'ali-chat-window';
   chatWindow.innerHTML =
     '<div class="ali-chat-header">' +
-      '<div class="ali-chat-hdr-avatar">Ali</div>' +
+      '<img class="ali-chat-hdr-avatar" src="https://alisales.ai/assets/img/ali-avatar.png" alt="Ali">' +
       '<div class="ali-chat-title-row">' +
         '<div class="ali-chat-title">Ali – Satıştaki Sağ Kolunuz</div>' +
         '<div class="ali-chat-subtitle">' + (TENANT_NAME || 'Yapay Zekali Satış Asistanı') + '</div>' +
@@ -412,5 +431,5 @@
   });
   inputEl.addEventListener('touchstart', function (e) { e.stopPropagation(); });
 
-  console.log('[AliChat v17] tenant=' + TENANT_ID + ' brand=' + BRAND_COLOR + ' mobile=' + MOBILE_MODE);
+  console.log('[AliChat v17.1] tenant=' + TENANT_ID + ' brand=' + BRAND_COLOR + ' mobile=' + MOBILE_MODE);
 })();
